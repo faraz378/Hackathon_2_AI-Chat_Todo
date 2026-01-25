@@ -1,0 +1,375 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MCP Tools for Task Management",
+  "description": "Schema definitions for MCP tools used by the AI agent to manage tasks",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "create_task",
+        "description": "Create a new task for the user. Use this when the user asks to create, add, or make a new task.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "The task title (1-500 characters). Extract the main task description from the user's message.",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional detailed description of the task. Include any additional context or details mentioned by the user.",
+              "maxLength": 5000,
+              "nullable": true
+            },
+            "user_id": {
+              "type": "integer",
+              "description": "The user ID (automatically provided by the system, do not ask user for this)"
+            }
+          },
+          "required": ["title", "user_id"]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "integer",
+              "description": "The ID of the newly created task"
+            },
+            "title": {
+              "type": "string",
+              "description": "The task title"
+            },
+            "description": {
+              "type": "string",
+              "nullable": true,
+              "description": "The task description"
+            },
+            "completed": {
+              "type": "boolean",
+              "description": "Task completion status (always false for new tasks)"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the task was created"
+            }
+          }
+        },
+        "errors": [
+          {
+            "code": "VALIDATION_ERROR",
+            "message": "Title is required and must be 1-500 characters"
+          },
+          {
+            "code": "DATABASE_ERROR",
+            "message": "Failed to create task due to database error"
+          }
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_tasks",
+        "description": "List all tasks for the user. Use this when the user asks to see, show, list, or view their tasks.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "user_id": {
+              "type": "integer",
+              "description": "The user ID (automatically provided by the system)"
+            },
+            "completed": {
+              "type": "boolean",
+              "description": "Filter by completion status. If null, return all tasks.",
+              "nullable": true
+            }
+          },
+          "required": ["user_id"]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "tasks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "task_id": {
+                    "type": "integer",
+                    "description": "The task ID"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "The task title"
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "The task description"
+                  },
+                  "completed": {
+                    "type": "boolean",
+                    "description": "Task completion status"
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the task was created"
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the task was last updated"
+                  }
+                }
+              }
+            },
+            "total_count": {
+              "type": "integer",
+              "description": "Total number of tasks returned"
+            }
+          }
+        },
+        "errors": [
+          {
+            "code": "DATABASE_ERROR",
+            "message": "Failed to retrieve tasks due to database error"
+          }
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "update_task",
+        "description": "Update an existing task. Use this when the user asks to update, modify, change, complete, or mark a task as done.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "integer",
+              "description": "The ID of the task to update. If the user refers to a task by title, you must first call list_tasks to find the task_id."
+            },
+            "user_id": {
+              "type": "integer",
+              "description": "The user ID (automatically provided by the system)"
+            },
+            "title": {
+              "type": "string",
+              "description": "New task title (1-500 characters). Only provide if the user wants to change the title.",
+              "minLength": 1,
+              "maxLength": 500,
+              "nullable": true
+            },
+            "description": {
+              "type": "string",
+              "description": "New task description. Only provide if the user wants to change the description.",
+              "maxLength": 5000,
+              "nullable": true
+            },
+            "completed": {
+              "type": "boolean",
+              "description": "New completion status. Set to true when user says 'complete', 'done', 'finish', or 'mark as done'. Set to false when user says 'uncomplete' or 'reopen'.",
+              "nullable": true
+            }
+          },
+          "required": ["task_id", "user_id"]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "integer",
+              "description": "The task ID"
+            },
+            "title": {
+              "type": "string",
+              "description": "The updated task title"
+            },
+            "description": {
+              "type": "string",
+              "nullable": true,
+              "description": "The updated task description"
+            },
+            "completed": {
+              "type": "boolean",
+              "description": "The updated completion status"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the task was updated"
+            }
+          }
+        },
+        "errors": [
+          {
+            "code": "NOT_FOUND",
+            "message": "Task not found or does not belong to user"
+          },
+          {
+            "code": "VALIDATION_ERROR",
+            "message": "Invalid update parameters"
+          },
+          {
+            "code": "DATABASE_ERROR",
+            "message": "Failed to update task due to database error"
+          }
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "delete_task",
+        "description": "Delete a task. Use this when the user asks to delete, remove, or get rid of a task.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "integer",
+              "description": "The ID of the task to delete. If the user refers to a task by title, you must first call list_tasks to find the task_id."
+            },
+            "user_id": {
+              "type": "integer",
+              "description": "The user ID (automatically provided by the system)"
+            }
+          },
+          "required": ["task_id", "user_id"]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the deletion was successful"
+            },
+            "message": {
+              "type": "string",
+              "description": "Confirmation message"
+            },
+            "deleted_task_id": {
+              "type": "integer",
+              "description": "The ID of the deleted task"
+            }
+          }
+        },
+        "errors": [
+          {
+            "code": "NOT_FOUND",
+            "message": "Task not found or does not belong to user"
+          },
+          {
+            "code": "DATABASE_ERROR",
+            "message": "Failed to delete task due to database error"
+          }
+        ]
+      }
+    }
+  ],
+  "usage_guidelines": {
+    "user_id_handling": "The user_id parameter is automatically injected by the backend from the JWT token. The agent should not ask the user for their user_id.",
+    "task_references": "When users refer to tasks by title (e.g., 'complete the groceries task'), the agent should first call list_tasks to find the task_id, then use that ID in update_task or delete_task.",
+    "ambiguous_references": "If multiple tasks match the user's description, the agent should ask the user to clarify which task they mean by listing the matching tasks.",
+    "error_handling": "If a tool call fails, the agent should explain the error to the user in simple terms and suggest alternatives or corrections.",
+    "confirmation": "After successfully executing a tool, the agent should confirm the action to the user with relevant details (e.g., 'I've created a task titled \"buy groceries\"')."
+  },
+  "examples": [
+    {
+      "user_message": "Create a task to buy groceries",
+      "tool_call": {
+        "tool": "create_task",
+        "inputs": {
+          "title": "buy groceries",
+          "description": null,
+          "user_id": 7
+        }
+      },
+      "tool_response": {
+        "task_id": 89,
+        "title": "buy groceries",
+        "description": null,
+        "completed": false,
+        "created_at": "2026-01-23T10:30:00Z"
+      },
+      "agent_response": "I've created a task 'buy groceries' for you. It's been added to your task list."
+    },
+    {
+      "user_message": "Show me all my tasks",
+      "tool_call": {
+        "tool": "list_tasks",
+        "inputs": {
+          "user_id": 7,
+          "completed": null
+        }
+      },
+      "tool_response": {
+        "tasks": [
+          {
+            "task_id": 89,
+            "title": "buy groceries",
+            "description": null,
+            "completed": false,
+            "created_at": "2026-01-23T10:30:00Z",
+            "updated_at": "2026-01-23T10:30:00Z"
+          },
+          {
+            "task_id": 90,
+            "title": "call dentist",
+            "description": "Schedule appointment",
+            "completed": false,
+            "created_at": "2026-01-23T09:15:00Z",
+            "updated_at": "2026-01-23T09:15:00Z"
+          }
+        ],
+        "total_count": 2
+      },
+      "agent_response": "You have 2 tasks:\n1. Buy groceries (not completed)\n2. Call dentist - Schedule appointment (not completed)"
+    },
+    {
+      "user_message": "Mark the groceries task as done",
+      "tool_calls": [
+        {
+          "tool": "list_tasks",
+          "inputs": {
+            "user_id": 7,
+            "completed": null
+          }
+        },
+        {
+          "tool": "update_task",
+          "inputs": {
+            "task_id": 89,
+            "user_id": 7,
+            "completed": true
+          }
+        }
+      ],
+      "agent_response": "I've marked 'buy groceries' as completed. Great job!"
+    },
+    {
+      "user_message": "Delete the dentist task",
+      "tool_calls": [
+        {
+          "tool": "list_tasks",
+          "inputs": {
+            "user_id": 7,
+            "completed": null
+          }
+        },
+        {
+          "tool": "delete_task",
+          "inputs": {
+            "task_id": 90,
+            "user_id": 7
+          }
+        }
+      ],
+      "agent_response": "I've deleted the 'call dentist' task from your list."
+    }
+  ]
+}

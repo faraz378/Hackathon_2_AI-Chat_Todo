@@ -1,0 +1,622 @@
+openapi: 3.0.3
+info:
+  title: Todo App Authentication API
+  description: |
+    Authentication and authorization endpoints for the Todo Full-Stack Web Application.
+
+    This API extends the Spec-1 backend with JWT-based authentication. All task management
+    endpoints now require a valid JWT token in the Authorization header.
+
+    **Authentication Flow**:
+    1. User registers via POST /auth/signup
+    2. User signs in via POST /auth/signin (receives JWT token)
+    3. User includes token in Authorization header for all protected requests
+    4. Backend verifies token and enforces user data isolation
+
+    **Security**:
+    - Passwords hashed with bcrypt (work factor 12)
+    - JWT tokens signed with HMAC-SHA256
+    - 24-hour token expiration
+    - Stateless token verification (no session database)
+  version: 2.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.example.com
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User registration and sign-in endpoints
+  - name: Tasks
+    description: Task management endpoints (protected)
+
+paths:
+  /auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: |
+        Create a new user account with email and password. The password is hashed
+        with bcrypt before storage. Returns the created user ID on success.
+
+        **Validation Rules**:
+        - Email must be valid format (RFC 5322)
+        - Email must be unique (not already registered)
+        - Password must be at least 8 characters
+      operationId: signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+            examples:
+              valid:
+                summary: Valid registration
+                value:
+                  email: user@example.com
+                  password: securepassword123
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupResponse'
+              examples:
+                success:
+                  summary: Successful registration
+                  value:
+                    message: User created successfully
+                    user_id: 123
+        '400':
+          description: Validation error or duplicate email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                duplicate_email:
+                  summary: Email already registered
+                  value:
+                    error:
+                      code: EMAIL_EXISTS
+                      message: Email already registered
+                weak_password:
+                  summary: Password too short
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Password must be at least 8 characters
+                invalid_email:
+                  summary: Invalid email format
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Invalid email format
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/signin:
+    post:
+      tags:
+        - Authentication
+      summary: Sign in and receive JWT token
+      description: |
+        Authenticate with email and password. Returns a JWT access token on success.
+        The token must be included in the Authorization header for all protected requests.
+
+        **Token Details**:
+        - Type: Bearer token
+        - Expiration: 24 hours
+        - Format: Authorization: Bearer <token>
+      operationId: signin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SigninRequest'
+            examples:
+              valid:
+                summary: Valid credentials
+                value:
+                  email: user@example.com
+                  password: securepassword123
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              examples:
+                success:
+                  summary: Successful authentication
+                  value:
+                    access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEyMywiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzA1MTA0MDAwLCJleHAiOjE3MDUxOTA0MDB9.signature
+                    token_type: bearer
+                    expires_in: 86400
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_credentials:
+                  summary: Wrong email or password
+                  value:
+                    error:
+                      code: INVALID_CREDENTIALS
+                      message: Invalid email or password
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{user_id}/tasks:
+    post:
+      tags:
+        - Tasks
+      summary: Create a new task (protected)
+      description: |
+        Create a new task for the authenticated user. Requires valid JWT token.
+        The user_id in the URL must match the user_id in the JWT token.
+      operationId: createTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Tasks
+      summary: Get all tasks for user (protected)
+      description: |
+        Retrieve all tasks for the authenticated user. Requires valid JWT token.
+        The user_id in the URL must match the user_id in the JWT token.
+      operationId: getTasks
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{user_id}/tasks/{task_id}:
+    get:
+      tags:
+        - Tasks
+      summary: Get a specific task (protected)
+      description: |
+        Retrieve a specific task by ID. Requires valid JWT token.
+        The user_id in the URL must match the user_id in the JWT token.
+      operationId: getTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+        - $ref: '#/components/parameters/TaskIdPath'
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: NOT_FOUND
+                  message: Task not found
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Tasks
+      summary: Update a task (protected)
+      description: |
+        Update an existing task. Requires valid JWT token.
+        The user_id in the URL must match the user_id in the JWT token.
+      operationId: updateTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+        - $ref: '#/components/parameters/TaskIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Tasks
+      summary: Delete a task (protected)
+      description: |
+        Delete an existing task. Requires valid JWT token.
+        The user_id in the URL must match the user_id in the JWT token.
+      operationId: deleteTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+        - $ref: '#/components/parameters/TaskIdPath'
+      responses:
+        '200':
+          description: Task deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Task deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from /auth/signin endpoint.
+        Include in Authorization header as: Bearer <token>
+
+  parameters:
+    UserIdPath:
+      name: user_id
+      in: path
+      required: true
+      description: User ID (must match authenticated user)
+      schema:
+        type: integer
+        example: 123
+
+    TaskIdPath:
+      name: task_id
+      in: path
+      required: true
+      description: Task ID
+      schema:
+        type: integer
+        example: 456
+
+  schemas:
+    SignupRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: User email address (unique identifier)
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: User password (minimum 8 characters)
+          example: securepassword123
+
+    SigninRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: user@example.com
+        password:
+          type: string
+          description: User password
+          example: securepassword123
+
+    SignupResponse:
+      type: object
+      required:
+        - message
+        - user_id
+      properties:
+        message:
+          type: string
+          example: User created successfully
+        user_id:
+          type: integer
+          description: ID of the created user
+          example: 123
+
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+        - expires_in
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEyMywiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzA1MTA0MDAwLCJleHAiOjE3MDUxOTA0MDB9.signature
+        token_type:
+          type: string
+          enum: [bearer]
+          example: bearer
+        expires_in:
+          type: integer
+          description: Token expiration time in seconds (24 hours)
+          example: 86400
+
+    TaskCreate:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Task title
+          example: Buy groceries
+        description:
+          type: string
+          maxLength: 5000
+          nullable: true
+          description: Task description (optional)
+          example: Milk, eggs, bread
+
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Task title
+          example: Buy groceries
+        description:
+          type: string
+          maxLength: 5000
+          nullable: true
+          description: Task description
+          example: Milk, eggs, bread, cheese
+        completed:
+          type: boolean
+          description: Task completion status
+          example: true
+
+    TaskResponse:
+      type: object
+      required:
+        - id
+        - title
+        - completed
+        - user_id
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          description: Task ID
+          example: 456
+        title:
+          type: string
+          description: Task title
+          example: Buy groceries
+        description:
+          type: string
+          nullable: true
+          description: Task description
+          example: Milk, eggs, bread
+        completed:
+          type: boolean
+          description: Task completion status
+          example: false
+        user_id:
+          type: integer
+          description: Owner user ID
+          example: 123
+        created_at:
+          type: string
+          format: date-time
+          description: Task creation timestamp
+          example: 2026-01-13T10:30:00Z
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: 2026-01-13T10:30:00Z
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Error code for programmatic handling
+              enum:
+                - EMAIL_EXISTS
+                - VALIDATION_ERROR
+                - INVALID_CREDENTIALS
+                - MISSING_TOKEN
+                - INVALID_TOKEN
+                - EXPIRED_TOKEN
+                - FORBIDDEN
+                - NOT_FOUND
+                - INTERNAL_ERROR
+              example: INVALID_CREDENTIALS
+            message:
+              type: string
+              description: Human-readable error message
+              example: Invalid email or password
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_token:
+              summary: No Authorization header
+              value:
+                error:
+                  code: MISSING_TOKEN
+                  message: Authorization header required
+            invalid_token:
+              summary: Invalid or malformed token
+              value:
+                error:
+                  code: INVALID_TOKEN
+                  message: Invalid or expired token
+            expired_token:
+              summary: Token has expired
+              value:
+                error:
+                  code: EXPIRED_TOKEN
+                  message: Token has expired
+
+    ForbiddenError:
+      description: User cannot access another user's resources
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Cannot access another user's resources
