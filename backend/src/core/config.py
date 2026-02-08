@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_HOURS: int = 24
 
+    # Better Auth Configuration
+    BETTER_AUTH_SECRET: str
+
     # OpenAI Configuration
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-3.5-turbo"

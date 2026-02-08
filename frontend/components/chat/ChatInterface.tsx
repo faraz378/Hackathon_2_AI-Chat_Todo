@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/auth/hooks';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
+import { sendMessage } from '@/lib/api/chat';
 
 interface Message {
   id: number;
@@ -44,42 +45,7 @@ export default function ChatInterface() {
     setError(null);
 
     try {
-      // Get the token using the correct key from auth storage
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch('http://localhost:8001/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          conversation_id: conversationId,
-          message: content.trim()
-        })
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to send message';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error?.message || errorData.detail?.error?.message || 'Failed to send message';
-        } catch (e) {
-          // If response is not JSON, try to get text
-          try {
-            const errorText = await response.text();
-            errorMessage = errorText || `HTTP error! status: ${response.status}`;
-          } catch {
-            errorMessage = `HTTP error! status: ${response.status}`;
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
+      const data = await sendMessage(conversationId, content.trim());
 
       // Update conversation ID if this was a new conversation
       if (!conversationId) {
